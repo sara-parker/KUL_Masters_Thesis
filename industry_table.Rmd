@@ -1,0 +1,37 @@
+---
+title: "Tercile breakdown by industry"
+output: word_document
+---
+
+```{r table-output, results='asis'}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(readxl)
+library(kableExtra)
+
+# Load your data
+CARs_3day_window <- read_excel("/Users/saraparker/Library/CloudStorage/OneDrive-Personal/KU Leuven/MBA - Accounting/Masters Thesis/data/CARs_3day_window_for_table.xlsx")
+
+
+# Create the frequency table
+frequency_table <- CARs_3day_window %>%
+  count(acquirer_industry, two_digit_industry_description, CAR_Tercile) %>%
+  pivot_wider(names_from = CAR_Tercile, values_from = n, values_fill = list(n = 0))
+
+# Adding the totals for each tercile column
+totals <- frequency_table %>%
+  summarise(across(c(Low, Medium, High), sum, na.rm = TRUE))
+
+# Since 'totals' will be a one-row data frame, add the "Totals" label
+totals$acquirer_industry <- "Totals"
+
+# Bind the totals row to the original frequency table
+frequency_table_with_totals <- bind_rows(frequency_table, totals)
+
+# Check the last few rows to make sure the totals row has been added
+tail(frequency_table_with_totals)
+
+# Display the table using kable for Word output
+kable(frequency_table_with_totals, format = "simple", booktabs = TRUE)
