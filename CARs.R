@@ -15,7 +15,7 @@ library(psych)
 library(DescTools)
 library(dunn.test)
 
-#################################################### STEP 1: IMPORT AND CLEAN DATA, FILTER SAMPLE ################################################################
+############## STEP 1: IMPORT AND CLEAN DATA, FILTER SAMPLE ####################
 
 # Import data
 # financial_data has total index returns in the first column associated with an ISIN and unadjusted daily closing prices in the ISIN.2 column
@@ -71,7 +71,7 @@ for (i in 2:ncol(financial_data)) {
 # Convert date columns to correct format without timestamp
 financial_data$Date <- as.Date(financial_data$Date, format = "%Y/%m/%d")
  
-####################################### transaction data #########################################################################
+######################### transaction data #####################################
 
 # Convert date columns to correct format without timestamp
 transactions$`Announced date` <-as.Date(transactions$`Announced date`, format = "%Y/%m/%d")
