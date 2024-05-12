@@ -21,8 +21,8 @@ library(dunn.test)
 # financial_data has total index returns in the first column associated with an ISIN and unadjusted daily closing prices in the ISIN.2 column
 transactions <- read_excel("./input/Zephyr_Definitive_Repeating.xlsx", sheet = "Results")
 financial_data <- read_excel("./input/unique_acquiror_isins2.xlsx", sheet = "tri and price", .name_repair = "minimal")
-auditor_data <- read_excel("./input/auditors.xlsx")
-crsp_data <- read_csv("./input/financial_data_938_CRSP.csv")
+auditor_data <- read_excel("./input/robustness_tests_balance_sheet.xlsx")
+crsp_data <- read_csv("./input/financial_data_CRSP.csv")
 
 # Count initial number of transactions and unique ISINs in Zephyr data
 
@@ -41,7 +41,7 @@ remove(starting_unique_firm_count_transactions, starting_unique_transaction_coun
 # Avoid displaying values in scientific notation, for readability
 options(scipen = 999) 
 
-####################################### financial_data #########################################################################
+############# financial_data ####################################################
 # Rename columns with ISIN headers such that repeated ISINs can be uniquely identified
 original_colnames <- colnames(financial_data)
 new_colnames <- c()
@@ -423,32 +423,19 @@ transactions <- transactions %>%
     industry_relatedness = `Acquiror primary US SIC code` == `Target primary US SIC code`
   )
 
-# Big4 auditor
+# Big4 auditor ! 
+
 auditor_data <- auditor_data %>%
-  mutate(event_year = year(as.Date(`EVENT DATE`, format="%Y-%m-%d")))
+  select(`Data Year - Fiscal`, `Ticker Symbol`, `Auditor`)
+
+names(auditor_data) <- c("year_of_announcement", "Acquiror ticker symbol", "Auditor")
 
 transactions <- transactions %>%
-  mutate(announcement_year = year(as.Date(`Announced date`, format="%Y-%m-%d")))
-
-transactions <- transactions %>%
-  left_join(auditor_data, by = c("Acquiror ticker symbol" = "TICKER", "announcement_year" = "event_year"))%>%
-  arrange(`Deal Number`, `EVENT DATE`) %>%
   group_by(`Deal Number`) %>%
-  fill(`EVENT DATE`, `CURR AUDITOR NAME`, .direction = "down") %>%
-  ungroup() 
-
-
-### Big4 data --> Append auditor data from Compustat first
-
-annual_balance_sheet_data_compustat <- read_excel("./input/robustness_balance_sheet.xlsx")
-
-auditor_data <- annual_balance_sheet_data_compustat[, c("Data Year - Fiscal", "Ticker Symbol", "Auditor")]
-
-names(auditor_data) <- c("announcement_year", "Acquiror ticker symbol", "Auditor")
-
-transactions <- merge(auditor_data, transactions, by=c("Acquiror ticker symbol", "announcement_year"))
+  left_join(auditor_data, by=c("Acquiror ticker symbol", "year_of_announcement"))
 
 transactions <- transactions %>%
+  group_by(`Deal Number`) %>%
   mutate(is_Big4 = ifelse(Auditor %in% c(4, 5, 6, 7), TRUE, FALSE))
 
 
