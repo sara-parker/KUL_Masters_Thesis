@@ -8,7 +8,7 @@
 
 - ./input/Zephyr_Definitive_Repeating.xlsx
 - ./input/unique_acquiror_isins2.xlsx
-- ./input/financial_data_938_CRSP.csv
+- ./input/financial_data_CRSP.csv
 - ./input/robustness_tests_balance_sheet.xlsx
 
 3. This script does the following:
