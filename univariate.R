@@ -27,7 +27,7 @@ library(broom)
 
 # Import balance sheet data and transaction_for_regression data
 #annual_balance_sheet_data <- read_excel("./input/annual_balance_sheet_data2_Compustat.xlsx")
-transactions_for_regression <- read_excel("./output/transactions_for_analysis.xlsx") 
+#transactions_for_regression <- read_excel("./output/transactions_for_analysis.xlsx") 
 
 # balance_sheet_data$`Data Date` <- as.Date(balance_sheet_data$`Data Date`) # FOR QUARTERLY DATA
 #annual_balance_sheet_data$`Data Date` <- as.Date(annual_balance_sheet_data$`Data Date`)
@@ -101,11 +101,11 @@ transactions_for_regression <- read_excel("./output/transactions_for_analysis.xl
 
 
 
-##############################################################################################################
-##############################################################################################################
-######################################### ANNUAL DATA ################################################
-##############################################################################################################
-##############################################################################################################
+
+################################################################################
+################################# ANNUAL DATA ##################################
+################################################################################
+
 
 
 # Extract the M&A announcement year for each firm and create a new dataframe
@@ -134,13 +134,14 @@ transactions_for_regression <- read_excel("./output/transactions_for_analysis.xl
 #write_xlsx(filtered_balance_sheet_data, "./output/annual_bs_to_check_missing_values.xlsx")
 
 
-#####################################################################################################################
-################## TO AVOID REDUCING SAMPLE SIZE HERE, ##############################################################
-###############   NA VALUES HAVE BEEN FILLED IN WHERE POSSIBLE #################################################
-#####################################################################################################################
-#####################################################################################################################
-######################### START HERE ################################################################################
-#####################################################################################################################
+###############################################################################
+################## TO AVOID REDUCING SAMPLE SIZE HERE, ########################
+###############   NA VALUES HAVE BEEN FILLED IN WHERE POSSIBLE #################
+################################################################################
+###############################################################################
+######################### START HERE ###########################################
+################################################################################
+
 library(readxl)
 library(dplyr)
 library(lubridate)
@@ -522,8 +523,10 @@ print("Kruskal-Wallis Results:")
 print(kruskal_results_list)
 
 
-############-------------------------------------------------------
-########################################################### Plots and KS, Shapiro-Wilk tests for all vars.
+###########################################################
+#   Plots and KS, Shapiro-Wilk tests for all vars.
+########################################################### 
+
 # Define a function to perform normality tests and generate plots
 perform_checks <- function(df, var_name) {
   df %>%
@@ -555,7 +558,7 @@ perform_checks <- function(df, var_name) {
 # Apply the function to each variable and create a list of results
 results <- map(variables_to_test, ~perform_checks(winsorized_balance_sheet_data, .x))
 
-# To print all results or save plots, you can loop over this list
+# Print all results
 for (result in results) {
   print(result$normality_results)
   print(result$histogram)
@@ -563,9 +566,11 @@ for (result in results) {
 }
 
 
-########################################################### ROBUSTNESS TESTING
-# Truncate extreme values # ROBUSTNESS TESTING
-# Function to truncate values beyond the specified quantiles
+#############################################################################
+#                        ROBUSTNESS TESTING
+#############################################################################
+
+# Truncate extreme values 
 truncate <- function(x, probs = c(0.05, 0.95)) {
   quantiles <- quantile(x, probs = probs, na.rm = TRUE)
   x[x < quantiles[1]] <- NA
@@ -573,7 +578,7 @@ truncate <- function(x, probs = c(0.05, 0.95)) {
   return(x)
 }
 
-# Truncate extreme values
+
 truncated_balance_sheet_data <- cleaned_annual_balance_sheet_data %>% 
   arrange(fiscal_year) %>%
   filter(years_from_announcement >= -1 & years_from_announcement <= 2, Window == "[-1,+1]") %>%
@@ -618,25 +623,17 @@ truncated_balance_sheet_data %>%
     print(qqplot)
   })
 rm(truncated_balance_sheet_data, normality_results_truncated)
-######################################### END OF ROBUSTNESS TEST
 
 
-# End of script
-
-#######wilcoxon 
-# Assuming you have `tercile_summary_stats` with different CAR Terciles
-group1 <- tercile_summary_stats$scaled_awca_winsorized[tercile_summary_stats$CAR_Tercile == "1"]
-group2 <- tercile_summary_stats$scaled_awca_winsorized[tercile_summary_stats$CAR_Tercile == "2"]
-
-# Compare medians between low and high CAR Tercile groups
-wilcox.test(group1, group2)
+################## END OF ROBUSTNESS TEST ####################### 
 
 
 
-####### box plots
-library(tidyr)
-library(dplyr)
-library(ggplot2)
+
+################################################################################
+#                                boxplots
+################################################################################
+
 
 
 # Reshape the data to long format
@@ -669,19 +666,16 @@ ggplot(long_data, aes(x = Variable, y = Value, fill = CAR_Tercile)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_fill_brewer(palette = "Set3")
 
-########QQ plots for each variable by year from announcement
-library(dplyr)
-library(ggplot2)
-library(tidyr)
+################################################################################
+#         QQ plots for each variable by year from announcement
+################################################################################
 
-# Example variables to plot
+# Variables to plot
 variables_to_plot <- c( "scaled_awca_winsorized",
                         "CAR_winsorized",
                         "ln_mve_winsorized", # regression model uses lagged ln_mve
                         "scaled_yoy_change_in_sales_winsorized",
-                        "mtb_winsorized", # regression uses lagged mtb
-                        "asset_turnover_winsorized", # not in regression but seems interesting to describe sample
-                        "scaled_working_capital_winsorized" )# not in regression but seems interesting to describe sample
+                        "mtb_winsorized") # regression uses lagged mtb
 
 # Reshape the data to long format for easier plotting
 long_format_data <- winsorized_balance_sheet_data %>%
@@ -699,302 +693,4 @@ qq_plots <- ggplot(long_format_data, aes(sample = value)) +
 
 print(qq_plots)
 
-
-
-
-##############################################################################################################
-##############################################################################################################
-######################################### QUARTERLY DATA ################################################
-##############################################################################################################
-##############################################################################################################
-
-# Add a quarter identifier to the balance sheet data
-balance_sheet_data <- balance_sheet_data %>%
-  mutate(fiscal_quarter_id = year(`Data Date`) * 4 + quarter(`Data Date`))
-
-# Add a quarter identifier to the transactions data 
-# This step correctly assigns quarter identifiers to each transaction for serial acquirers.
-transactions_for_regression <- transactions_for_regression %>%
-  mutate(announcement_quarter_id = year(`Announced date`) * 4 + quarter(`Announced date`))
-
-# Merge the datasets and filter for the periods Q[-2] to Q[+12], with Q[0] the quarter of announcement
-# Many-to-many relationship expected because some firms engage in serial transactions, and in some quarters, multiple firms engage in transactions
-merged_data <- balance_sheet_data %>%
-  inner_join(transactions_for_regression, by = c("Ticker Symbol" = "Acquiror ticker symbol"), relationship = "many-to-many") %>%
-  # Calculate the difference in quarters
-  mutate(quarter_diff = fiscal_quarter_id - announcement_quarter_id) %>%
-  # Filter for the desired time window around each announcement
-  filter(quarter_diff >= -6 & quarter_diff <= 12) # >= -6 ensures there is sufficient data to calculate lagged variables in next step
-
-# Write data to Excel to investigate NAs
-# write_xlsx(merged_data, "./output/merged_data_with_NAs.xlsx")
-
-# Calculate new variables
-merged_data <- merged_data%>%
-  group_by(`Deal Number`, CAR_Tercile)%>%
-  mutate(
-    asset_turnover = sales/total_assets,
-    #    qoq_change_in_sales = (sales - lag(sales)),
-    seasonally_adjusted_change_in_sales = (sales - lag(sales, n=4)),
-    #    scaled_qoq_change_in_sales = qoq_change_in_sales/lag(total_assets), # Absolute change in sales from the previous quarter, as a proportion of assets last quarter
-    scaled_adj_change_in_sales = seasonally_adjusted_change_in_sales/lag(total_assets, n=4), # Absolute change in sales over the same quarter last year, as a proportion of assets in the same quarter the previous year
-    ln_mve = log(market_value),
-    mtb = market_value / book_value,
-    working_capital = (current_assets - cash_st_investments) - (current_liabilities - short_term_debt),
-    awca = working_capital - (lag(working_capital, n=4)/lag(sales, n=4))*sales,
-    scaled_awca = awca / lag(total_assets, n=4)
-  )%>%
-  ungroup()
-
-
-temp_winsorized <- merged_data %>%
-  filter(!is.na(total_assets), !is.na(asset_turnover),   # filter out NA values
-         !is.na(seasonally_adjusted_change_in_sales),
-         !is.na(scaled_adj_change_in_sales), !is.na(ln_mve),
-         !is.na(mtb), !is.na(awca)) %>%
-  mutate(
-    total_assets_winsorized = Winsorize(total_assets, probs = c(0.05, 0.95), na.rm = TRUE),
-    asset_turnover_winsorized = Winsorize(asset_turnover, probs = c(0.05, 0.95), na.rm = TRUE),
-    #    qoq_change_in_sales_winsorized = Winsorize(qoq_change_in_sales, probs = c(0.05, 0.95), na.rm = TRUE), # if this is added back, check NA values and add to filter above if necessary
-    seasonally_adjusted_change_in_sales_winsorized = Winsorize(seasonally_adjusted_change_in_sales, probs = c(0.05, 0.95), na.rm = TRUE),
-    #    scaled_qoq_change_in_sales_winsorized = Winsorize(scaled_qoq_change_in_sales, probs = c(0.05, 0.95), na.rm = TRUE),
-    scaled_adj_change_in_sales_winsorized = Winsorize(scaled_adj_change_in_sales, probs = c(0.05, 0.95), na.rm = TRUE),
-    ln_mve_winsorized = Winsorize(ln_mve, probs = c(0.05, 0.95), na.rm = TRUE),
-    mtb_winsorized = Winsorize(mtb, probs = c(0.05, 0.95), na.rm = TRUE),
-    awca_winsorized = Winsorize(awca, probs = c(0.05, 0.95), na.rm = TRUE)
-  ) %>%
-  ungroup()
-
-# Join the Winsorized data back to the original dataset
-merged_data <- merged_data %>%
-  left_join(temp_winsorized %>%
-              select(`Deal Number`, quarter_diff, total_assets_winsorized, asset_turnover_winsorized,
-                     seasonally_adjusted_change_in_sales_winsorized,
-                     scaled_adj_change_in_sales_winsorized,
-                     ln_mve_winsorized, mtb_winsorized, awca_winsorized),
-            by = c("Deal Number", "quarter_diff"))
-
-# Calculate summary statistics for the winsorized variables
-summary_stats <- merged_data %>%
-  filter(quarter_diff >= -2 & quarter_diff <= 12) %>%
-  group_by(quarter_diff, CAR_Tercile) %>%
-  summarize(
-    n = n_distinct(`Deal Number`),
-    Mean_total_assets = mean(total_assets_winsorized, na.rm = TRUE),
-    SD_total_assets = sd(total_assets_winsorized, na.rm = TRUE),
-    First_quartile_total_assets = quantile(total_assets_winsorized, 0.25, na.rm = TRUE),
-    Median_total_assets = median(total_assets_winsorized, na.rm = TRUE),
-    Third_quartile_total_assets = quantile(total_assets_winsorized, 0.75, na.rm = TRUE),
-    Mean_asset_turnover = mean(asset_turnover_winsorized, na.rm = TRUE),
-    SD_asset_turnover = sd(asset_turnover_winsorized, na.rm = TRUE),
-    First_quartile_asset_turnover = quantile(asset_turnover_winsorized, 0.25, na.rm = TRUE),
-    Median_asset_turnover = median(asset_turnover_winsorized, na.rm = TRUE),
-    Third_quartile_asset_turnover = mean(asset_turnover_winsorized, 0.75, na.rm = TRUE),
-    #    Mean_qoq_sales = mean(qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    SD_qoq_sales = sd(qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    First_quartile_qoq_sales = quantile(qoq_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    #    Median_qoq_sales = median(qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    Third_quartile_qoq_sales = quantile(qoq_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    Mean_seasonally_adjusted_change_in_sales = mean(seasonally_adjusted_change_in_sales_winsorized, na.rm = TRUE),
-    SD_seasonally_adjusted_sales = sd(seasonally_adjusted_change_in_sales_winsorized, na.rm = TRUE),
-    First_quartile_seasonally_adjusted_sales = quantile(seasonally_adjusted_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    Median_seasonally_adjusted_sales = median(seasonally_adjusted_change_in_sales_winsorized, na.rm = TRUE),
-    Third_quartile_seasonally_adjusted_sales = quantile(seasonally_adjusted_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    #    Mean_scaled_qoq_sales = mean(scaled_qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    SD_scaled_qoq_sales = sd(scaled_qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    First_quartile_scaled_qoq_sales = quantile(scaled_qoq_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    #    Median_scaled_qoq_sales = median(scaled_qoq_change_in_sales_winsorized, na.rm = TRUE),
-    #    Third_quartile_scaled_qoq_sales = quantile(scaled_qoq_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    Mean_scaled_yoy_sales = mean(scaled_adj_change_in_sales_winsorized, na.rm = TRUE),
-    SD_scaled_yoy_sales = sd(scaled_adj_change_in_sales_winsorized, na.rm = TRUE),
-    First_quartile_scaled_yoy_sales = quantile(scaled_adj_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    Median_scaled_yoy_sales = median(scaled_adj_change_in_sales_winsorized, na.rm = TRUE),
-    Third_quartile_scaled_yoy_sales = quantile(scaled_adj_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    Mean_ln_mve = mean(ln_mve_winsorized, na.rm = TRUE),
-    SD_ln_mve = sd(ln_mve_winsorized, na.rm = TRUE),
-    First_quartile_ln_mve = quantile(ln_mve_winsorized, 0.25, na.rm = TRUE),
-    Median_ln_mve = median(ln_mve_winsorized, na.rm = TRUE),
-    Third_quartile_ln_mve = quantile(ln_mve_winsorized, 0.75, na.rm = TRUE)
-  )%>%
-  #  mutate(quarters_from_announcement = quarter_diff)%>%
-  ungroup()
-
-####################################### check above ^ fewer than 100 transactions are being taken into account !
-
-# Transpose summary_stats data to have quarters as column headers and stats as rows
-transposed_summary_stats <- summary_stats %>%
-  pivot_longer(
-    cols = -quarter_diff, # Exclude the quarter_diff column from transposing
-    names_to = "Statistic",
-    values_to = "Value"
-  ) %>%
-  pivot_wider(
-    names_from = "quarter_diff",
-    values_from = "Value"
-  )
-
-write_xlsx(transposed_summary_stats, "./output/summary_stats_quarterly_transposed.xlsx")
-
-# Create a table to be edited in Word
-summary_stats_table <- flextable(transposed_summary_stats)
-
-summary_stats_table <- summary_stats_table %>%
-  theme_apa()%>%
-  bold(part = "header")
-
-doc <- read_docx() %>%
-  body_add_flextable(value = summary_stats_table) %>%
-  body_add_par("Summary Statistics Table", style = "heading 1")  # Adds a heading above the table
-
-#################################### partition on method of payment to check if
-#################### +awca is associated more with shares than cash transactions
-full_sample_summary_stats_cash_vs_shares <- winsorized_balance_sheet_data %>%
-  group_by(years_from_announcement, stock_deal) %>%
-  filter(years_from_announcement >= -1 & years_from_announcement <= 2, Window == "[-1,+1]") %>%
-  summarise(
-    Transactions_n = n_distinct(`Deal Number`),
-    Acquirors_n = n_distinct(`Acquiror ISIN number`),
-    
-    Mean_scaled_awca_winsorized = mean(scaled_awca_winsorized, na.rm = TRUE),
-    t_stat_awca = t.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_awca = t.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_scaled_awca_winsorized = sd(scaled_awca_winsorized, na.rm = TRUE),
-    First_quartile_scaled_awca_winsorized = quantile(scaled_awca_winsorized, 0.25, na.rm = TRUE),
-    Median_scaled_awca_winsorized = median(scaled_awca_winsorized, na.rm = TRUE),
-    W_stat_awca = wilcox.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_awca = wilcox.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_scaled_awca_winsorized = quantile(scaled_awca_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_car_winsorized = mean(CAR_winsorized, na.rm = TRUE),
-    SD_car_winsorized = sd(CAR_winsorized, na.rm = TRUE),
-    First_quartile_car_winsorized = quantile(CAR_winsorized, 0.25, na.rm = TRUE),
-    Median_car_winsorized = median(CAR_winsorized, na.rm = TRUE),
-    Third_quartile_car_winsorized = quantile(CAR_winsorized, 0.75, na.rm = TRUE),
-    t_stat_car = t.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_car = t.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    W_stat_car = wilcox.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_car = wilcox.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    
-    Mean_mve_winsorized = mean(mve_winsorized, na.rm = TRUE),
-    SD_ln_mve_winsorized = sd(mve_winsorized, na.rm = TRUE),
-    First_quartile_ln_mve_winsorized = quantile(mve_winsorized, 0.25, na.rm = TRUE),
-    Median_ln_mve_winsorized = median(mve_winsorized, na.rm = TRUE),
-    Third_quartile_ln_mve_winsorized = quantile(mve_winsorized, 0.75, na.rm = TRUE),
-    t_stat_mve = t.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_mve = t.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    W_stat_mve = wilcox.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_mve = wilcox.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    
-    Mean_scaled_yoy_sales_wins = mean(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    t_stat_yoy_sales = t.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_yoy_sales = t.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_scaled_yoy_sales_wins = sd(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    First_quartile_scaled_yoy_sales_wins = quantile(scaled_yoy_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    Median_scaled_yoy_sales_wins = median(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    W_stat_yoy_sales = wilcox.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_yoy_sales = wilcox.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_scaled_yoy_sales_wins = quantile(scaled_yoy_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_roa_winsorized = mean(roa_winsorized, na.rm = TRUE),
-    t_stat_roa = t.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_roa = t.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_roa_winsorized = sd(roa_winsorized, na.rm = TRUE),
-    First_quartile_roa_winsorized = quantile(roa_winsorized, 0.25, na.rm = TRUE),
-    Median_roa_winsorized = median(roa_winsorized, na.rm = TRUE),
-    W_stat_roa = wilcox.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_roa = wilcox.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_roa_winsorized = quantile(roa_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_mtb_winsorized = mean(mtb_winsorized, na.rm = TRUE),
-    t_stat_mtb = t.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_mtb = t.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_mtb_winsorized = sd(mtb_winsorized, na.rm = TRUE),
-    First_quartile_mtb_winsorized = quantile(mtb_winsorized, 0.25, na.rm = TRUE),
-    Median_mtb_winsorized = median(mtb_winsorized, na.rm = TRUE),
-    W_stat_mtb = wilcox.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_mtb = wilcox.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_mtb_winsorized = quantile(mtb_winsorized, 0.75, na.rm = TRUE),
-    
-    Tercile = "Full sample",
-    .groups = 'drop'
-  )
-
-##################### Partition sample on positive/negative CAR instead of terciles
-winsorized_balance_sheet_data <- winsorized_balance_sheet_data %>%
-  mutate(negative_car = ifelse(CAR_winsorized<0, TRUE, FALSE))
-
-summary_stats_pos_vs_neg_car <- winsorized_balance_sheet_data %>%
-  group_by(years_from_announcement, negative_car) %>%
-  filter(years_from_announcement >= -1 & years_from_announcement <= 2, Window == "[-1,+1]") %>%
-  summarise(
-    Transactions_n = n_distinct(`Deal Number`),
-    Acquirors_n = n_distinct(`Acquiror ISIN number`),
-    
-    Mean_scaled_awca_winsorized = mean(scaled_awca_winsorized, na.rm = TRUE),
-    t_stat_awca = t.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_awca = t.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_scaled_awca_winsorized = sd(scaled_awca_winsorized, na.rm = TRUE),
-    First_quartile_scaled_awca_winsorized = quantile(scaled_awca_winsorized, 0.25, na.rm = TRUE),
-    Median_scaled_awca_winsorized = median(scaled_awca_winsorized, na.rm = TRUE),
-    W_stat_awca = wilcox.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_awca = wilcox.test(scaled_awca_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_scaled_awca_winsorized = quantile(scaled_awca_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_car_winsorized = mean(CAR_winsorized, na.rm = TRUE),
-    SD_car_winsorized = sd(CAR_winsorized, na.rm = TRUE),
-    First_quartile_car_winsorized = quantile(CAR_winsorized, 0.25, na.rm = TRUE),
-    Median_car_winsorized = median(CAR_winsorized, na.rm = TRUE),
-    Third_quartile_car_winsorized = quantile(CAR_winsorized, 0.75, na.rm = TRUE),
-    t_stat_car = t.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_car = t.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    W_stat_car = wilcox.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_car = wilcox.test(CAR_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    
-    Mean_mve_winsorized = mean(mve_winsorized, na.rm = TRUE),
-    SD_ln_mve_winsorized = sd(mve_winsorized, na.rm = TRUE),
-    First_quartile_ln_mve_winsorized = quantile(mve_winsorized, 0.25, na.rm = TRUE),
-    Median_ln_mve_winsorized = median(mve_winsorized, na.rm = TRUE),
-    Third_quartile_ln_mve_winsorized = quantile(mve_winsorized, 0.75, na.rm = TRUE),
-    t_stat_mve = t.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_mve = t.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    W_stat_mve = wilcox.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_mve = wilcox.test(mve_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    
-    Mean_scaled_yoy_sales_wins = mean(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    t_stat_yoy_sales = t.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_yoy_sales = t.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_scaled_yoy_sales_wins = sd(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    First_quartile_scaled_yoy_sales_wins = quantile(scaled_yoy_change_in_sales_winsorized, 0.25, na.rm = TRUE),
-    Median_scaled_yoy_sales_wins = median(scaled_yoy_change_in_sales_winsorized, na.rm = TRUE),
-    W_stat_yoy_sales = wilcox.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_yoy_sales = wilcox.test(scaled_yoy_change_in_sales_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_scaled_yoy_sales_wins = quantile(scaled_yoy_change_in_sales_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_roa_winsorized = mean(roa_winsorized, na.rm = TRUE),
-    t_stat_roa = t.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_roa = t.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_roa_winsorized = sd(roa_winsorized, na.rm = TRUE),
-    First_quartile_roa_winsorized = quantile(roa_winsorized, 0.25, na.rm = TRUE),
-    Median_roa_winsorized = median(roa_winsorized, na.rm = TRUE),
-    W_stat_roa = wilcox.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_roa = wilcox.test(roa_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_roa_winsorized = quantile(roa_winsorized, 0.75, na.rm = TRUE),
-    
-    Mean_mtb_winsorized = mean(mtb_winsorized, na.rm = TRUE),
-    t_stat_mtb = t.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$statistic,
-    p_value_t_test_mtb = t.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.level = 0.95, na.action = na.exclude)$p.value,
-    SD_mtb_winsorized = sd(mtb_winsorized, na.rm = TRUE),
-    First_quartile_mtb_winsorized = quantile(mtb_winsorized, 0.25, na.rm = TRUE),
-    Median_mtb_winsorized = median(mtb_winsorized, na.rm = TRUE),
-    W_stat_mtb = wilcox.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$statistic,
-    p_value_Wilcox_mtb = wilcox.test(mtb_winsorized, mu = 0, alternative = "two.sided", conf.int = FALSE, conf.level = 0.95, exact = FALSE, correct = TRUE, na.action = na.exclude)$p.value,
-    Third_quartile_mtb_winsorized = quantile(mtb_winsorized, 0.75, na.rm = TRUE),
-    
-    Tercile = "Full sample",
-    .groups = 'drop'
-  )
-
-
-
-
-print(doc, target = "./output/Summary_Statistics_Table_transposed.docx")  # Save the Word document
+# End of script
