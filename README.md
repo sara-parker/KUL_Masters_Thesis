@@ -4,7 +4,7 @@
 
 ### CARs.R
 1. Load libraries.
-2. Read in data.
+2. Read in data from the following files:
 
 - ./input/Zephyr_Definitive_Repeating.xlsx
 - ./input/unique_acquiror_isins2.xlsx
@@ -25,7 +25,7 @@
 
 ### univariate.R
 1. Load libraries.
-2. Read in data.
+2. Read in data from the following files:
 
 - ./input/annual_bs_cleaned.xlsx
 - ./output/transactions_for_analysis.xlsx
@@ -43,7 +43,7 @@
 
 ### multivariate.R
 1. Load libraries.
-2. Read in data:
+2. Read in data from the following files:
 
 - ./output/winsorized_annual_balance_sheet_data.xlsx
 
