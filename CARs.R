@@ -87,6 +87,11 @@ transactions$`Deal method of payment value th USD` <- as.numeric(transactions$`D
 transactions <- transactions %>%
   mutate(year_of_announcement = as.integer(year(`Announced date`)))
 
+# Remove unneeded columns
+transactions <- transactions %>%
+  select ( -`Deal type`, -`Deal status`, -`Deal enterprise value th USD`, -`Deal value th USD...9`,
+           -`Deal value th USD...21`, -`Assumed completion date`, -`Completed date`, -`Initial stake (%)`,
+           -`Acquired stake (%)`, -`Final stake (%)`)
 
 ############################################## FIRST, APPLY BASIC CRITERIA FILTER  #########################################################################
 
@@ -108,7 +113,7 @@ print(original_acquirer_count) #1161 expected for Zephyr transactions
 
 
 
-############################################## NEXT, APPLY SIC CODE FILTER  #########################################################################
+######################### NEXT, APPLY SIC CODE FILTER  ##########################
 
 # Remove transaction if acquirer or target SIC code starts with "49" or "6"
 transactions <- transactions %>% 
@@ -138,7 +143,7 @@ print(sic_filtered_unique_transaction_count) # 956 expected count after filter
 print(sic_filtered_unique_firm_count_transactions) # 774 expected count after filter
 
 
-############################################## NEXT, APPLY EARN-OUTS FILTER  #########################################################################
+################ NEXT, APPLY EARN-OUTS FILTER  #################################
 
 # Remove deal number if earnout appears in 'Deal method of payment'
 deal_numbers_with_earnout <- transactions %>%
@@ -159,7 +164,7 @@ print(no_earnouts_acquirer_count) #730 expected for Zephyr transactions
 
 
 
-############################################## NEXT, APPLY METHOD OF PAYMENT FILTER  #########################################################################
+################### NEXT, APPLY METHOD OF PAYMENT FILTER  ######################
 
 # Combining the relevant categories for "Cash"
 percentages <- transactions %>%
@@ -245,16 +250,17 @@ pmt_filter_unique_firm_count_transactions <- transactions %>%
 print(pmt_filter_unique_firm_count_transactions) #571 expected for Zephyr_transactions
 
 transactions <- transactions %>%
-  select(-`Deal method of payment value th USD`, -`Deal method of payment`, -`Deal enterprise value th USD`, -`Deal status`,`Deal type`)
-############################################################################################################################################
+  select(-`Deal method of payment value th USD`, -`Deal method of payment`)
+###############################################################################
 
 
 # Write to Excel to retrieve financial data (stock prices, shares outstanding) for market cap calculation
 #write.xlsx(unique_acquiror_isins, "unique_acquiror_isins.xlsx")
 
-###################################### MATCH TRANSACTION DATA TO FINANCIAL DATA  #######################################
+################## MATCH TRANSACTION DATA TO FINANCIAL DATA  ###################
 
-# Filter transactions data to keep only those transactions for which acquirer financial data is available ---> robustness test: bigger sample
+# Filter transactions data to keep only those transactions for which
+# acquirer financial data is available ---> robustness test: bigger sample
 transactions <- transactions %>%
   filter(`Acquiror ISIN number` %in% colnames(financial_data)) #crsp data for deal ratio calculation
 
@@ -269,7 +275,7 @@ print(matched_unique_firm_count_transactions) #520 expected for Zephyr transacti
 
 
 
-###########################################  CALCULATION OF MARKET CAP & DEAL RATIO  ###############################################################
+###################  CALCULATION OF MARKET CAP & DEAL RATIO  ###################
 
 ### Calculate market cap 4 weeks before announcement
 #  = shares outstanding 4 weeks before announcement * avg share price over previous 4 weeks
@@ -326,7 +332,7 @@ merged_data <- transactions %>%
 #                                               market_cap_pre_announcement )) %>%
 #  mutate( deal_ratio = deal_equity_value_usd / market_cap_pre_announcement )
 
-################################################################################### ->>>> use ROBUST_CHECK for test!
+################################################################# ->>>> use ROBUST_CHECK for test!
 #transactions <- robust_check
 
 # Remove duplicate Deal Number rows, keeping only the first instance
@@ -334,7 +340,7 @@ merged_data <- transactions %>%
 #  group_by(`Deal Number`) %>%
 #  slice(1) %>%
 #  ungroup()
-############################
+##############################################################
 
 
 deal_ratios <- merged_data %>% #-------_> pause for robustness check
@@ -357,7 +363,7 @@ deal_ratio_filtered_unique_firm_count_transactions <- transactions %>%
   dplyr::summarize(unique_values = n_distinct(`Acquiror ISIN number`))
 print(deal_ratio_filtered_unique_firm_count_transactions) #261 expected for Zephyr transactions
 
-#################################### SAMPLE IS NOW FILTERED FOR ALL DEAL CRITERIA ###############################################################
+########### SAMPLE IS NOW FILTERED FOR ALL DEAL CRITERIA #######################
 
 # Filter the transactions dataframe to include only those entries that are present in the final_sample
 # (i.e., retain only those transactions with valid balance sheet data for analysis)
@@ -385,7 +391,8 @@ transactions <- filtered_transactions # would be good to clean up the columns he
 n_distinct(transactions$`Deal Number`)
 n_distinct(transactions$`Acquiror ISIN number.x`)
 
-############### Prepare categorical variables : serial acquirer, target domicile, method of payment, industry relatedness, Big4, industry fixed effects ###################
+############### Prepare categorical variables : serial acquirer, target domicile,
+########## method of payment, industry relatedness, Big4, industry fixed effects 
 
 # Serial acquirer
 transactions <- transactions %>%
@@ -447,7 +454,7 @@ transactions <- transactions %>%
 
 
 
-################################################ STEP 2: MARKET MODEL ESTIMATION #############################################################################
+###################### STEP 2: MARKET MODEL ESTIMATION #########################
 
 # Calculate log returns for RUA 3000 and firms
 for (i in 2:ncol(financial_data)) {
@@ -552,14 +559,14 @@ event_window_data <- data.frame(ISIN=character(), # Initialize the data frame fo
                                 stringsAsFactors=FALSE)
 # Definition of event windows 
 event_windows <- list(
-  "[-1,+1]" = c(-1, 1)
+  "[-1,+1]" = c(-1, 1),
 # "[-1,+2]" = c(-1, 2),
 #  "[-2,+2]" = c(-2, 2),
 #  "[-3,+1]" = c(-3, 1), 
-#  "[-3,+3]" = c(-3, 3),
-#  "[-5,+1]" = c(-5, 1),
+  "[-3,+3]" = c(-3, 3),
+  "[-5,+1]" = c(-5, 1),
 #  "[-5,+2]" = c(-5, 2), 
-#  "[-21,+1]" = c(-21, 1)
+  "[-21,+1]" = c(-21, 1)
 )
 
 
@@ -614,7 +621,7 @@ for(i in 1:nrow(transactions)) {
 event_window_data$Firm_Return <- as.numeric(as.character(event_window_data$Firm_Return))
 
 
-######################################### CARs computations #########################################
+######################################### CARs computations #####################
 
 # Step 1: Join 'alpha_beta_estimates' with 'event_window_data' to get Alpha and Beta for each ISIN
 event_window_data <- event_window_data %>%
@@ -661,8 +668,9 @@ transactions <- transactions %>%
 # write_xlsx(transactions, path = "./output/transactions_for_analysis.xlsx") # to use in univariate.R
 
 ################################################################################
-###################### CARS COMPLETE ###########################################
-########### DESCRIPTIVE STATISTICS OF CARS, SAMPLE COMPOSITION #################
+#                                 - CARS COMPLETE - 
+#
+#              DESCRIPTIVE STATISTICS OF CARS, SAMPLE COMPOSITION
 ################################################################################
 
 # Calculating summary statistics for the full sample, for each event window
@@ -705,7 +713,7 @@ stats_by_tercile <- CARs %>%
 write_xlsx(list(Full_Sample = stats_full_sample, By_Tercile = stats_by_tercile), 
            path = "./output/CAR_summary_statistics.xlsx")
 
-########################################### Z-test statistic computation to report instead of Wilcoxon w-score (for ease of analysis...)
+################## Z-test statistic computation to report instead of Wilcoxon w-score (for ease of analysis...)
 wilcoxon_tercile_results <- CARs %>%
   group_by(Window, CAR_Tercile) %>%
   dplyr::summarize(
@@ -720,9 +728,9 @@ wilcoxon_tercile_results <- CARs %>%
     z_statistic = (w_statistic - mean_W) / std_dev_W
   )
 
-#############################################################################################################
-# Sample characteristics 
-
+#############################################################################
+#                          Sample characteristics 
+#############################################################################
 
 
 ##### For categorical variables: industry_relatedness, target_domicile, method_of_payment, big4
@@ -873,8 +881,9 @@ print(doc, target = "./output/deal_characteristics_table2.docx")
 
 
 
-
-##### SAMPLE DISTRIBUTION OVER TIME, BY METHOD OF PMT, DOMESTIC / CROSS-BORDER ########
+################################################################################
+#    SAMPLE DISTRIBUTION OVER TIME, BY METHOD OF PMT, DOMESTIC / CROSS-BORDER 
+################################################################################
 
 ######## METHOD OF PMT
 # Summarize the data to count the number of each payment type per year ######### window???
@@ -943,19 +952,11 @@ payment_stats <- transactions %>%
     Cash_Only = n_distinct(`Deal Number`[Payment_Method == "Cash"]),
     Shares_Only = n_distinct(`Deal Number`[Payment_Method == "Shares"]),
   )
-##################################################### END OF SCRIPT #############################################
 
-# Clean up transactions for further analysis
-transactions <- transactions %>%
-  select ( -`Deal type`, -`Deal status`, -`Deal enterprise value th USD`, -`Deal value th USD...9`,
-          -`Deal value th USD...21`, -`Deal type`, -`Deal status`, -`Deal method of payment`, -`Deal method of payment value th USD`,
-          -`Assumed completion date`, -`Completed date`, -`Initial stake (%)`, -`Acquired stake (%)`, -`Final stake (%)`, -start_date,
-          -`Deal equity value th USD`, -Total_Cash, -Total_Shares, -Total_Equity_Value, -year_of_announcement, -`COMPANY FKEY`, `EVENT DATE`,...5,
-          -prev_date,-end_date,-next_date,-within_2_years, -`EVENT DATE`, -...5, -`Acquiror IPO date`)
+
 
 ################################################################################
-################################################################################
-################### to be fixed : industry distribution table ##################
+#                          industry distribution table
 ################################################################################
 
 
@@ -994,4 +995,5 @@ totals$two_digit_industry_description <- "All Industries"
 # Bind the totals row to the original frequency table
 frequency_table_with_totals <- bind_rows(frequency_table, totals)
 
+#################################### END OF SCRIPT #############################
 
